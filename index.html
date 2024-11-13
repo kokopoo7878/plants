@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تتبع سقي المزروعات</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Trifolium_April_2010-2.jpg/220px-Trifolium_April_2010-2.jpg');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1, h2 {
+            color: #2196F3; /* لون الأزرق */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        }
+
+        .form-container {
+            margin: 20px auto;
+            max-width: 400px;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        label, input, button, select {
+            display: block;
+            margin-bottom: 10px;
+            width: 100%;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            padding: 8px;
+            box-sizing: border-box; 
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            width: 100%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #388e3c;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #ddd;
+        }
+
+        .alert {
+            background-color: #ffeb3b;
+            color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px auto;
+            width: 90%;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>تتبع سقي المزروعات</h1>
+    
+    <div class="alert" id="alertMessage"></div>
+
+    <div class="form-container">
+        <label>اسم النبات:</label>
+        <input type="text" id="plantName" required>
+        
+        <label>آخر موعد للسقي:</label>
+        <input type="date" id="lastWatered" required>
+        
+        <label>كمية الماء (مل):</label>
+        <input type="number" id="waterAmount" required>
+        
+        <label>الموعد القادم للسقي:</label>
+        <select id="nextWateringDuration">
+            <option value="2">بعد يومين</option>
+            <option value="3">بعد 3 أيام</option>
+            <option value="7">بعد أسبوع</option>
+        </select>
+
+        <button id="addPlantButton" onclick="addPlant()">إضافة النبات</button>
+    </div>
+    
+    <h2>قائمة النباتات</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>اسم النبات</th>
+                <th>آخر موعد للسقي</th>
+                <th>كمية الماء</th>
+                <th>الأيام المتبقية للسقي</th>
+                <th>تعديل</th>
+                <th>حذف</th>
+            </tr>
+        </thead>
+        <tbody id="plantList">
+            <!-- سيتم إضافة النباتات هنا -->
+        </tbody>
+    </table>
+
+    <script>
+        let isEditing = false;
+        let editIndex = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            displayPlants();
+        });
+
+        function addPlant() {
+            const name = document.getElementById("plantName").value;
+            const lastWatered = document.getElementById("lastWatered").value;
+            const waterAmount = document.getElementById("waterAmount").value;
+            const nextWateringDuration = parseInt(document.getElementById("nextWateringDuration").value);
+
+            if (name && lastWatered && waterAmount) {
+                let plants = JSON.parse(localStorage.getItem("plants")) || [];
+                
+                if (isEditing) {
+                    // تحديث النبات الموجود
+                    plants[editIndex] = { name, lastWatered, waterAmount, nextWateringDuration };
+                    showAlert(تم تحديث النبات "${name}" بنجاح!);
+                    isEditing = false;
+                    editIndex = null;
+                    document.getElementById("addPlantButton").innerText = "إضافة النبات";
+                } else {
+                    // إضافة نبات جديد
+                    plants.push({ name, lastWatered, waterAmount, nextWateringDuration });
+                    showAlert(تم إضافة النبات "${name}" بنجاح!);
+                }
+                
+                localStorage.setItem("plants", JSON.stringify(plants));
+                displayPlants();
+
+                // إعادة تعيين الحقول
+                resetForm();
+            } else {
+                alert("يرجى ملء جميع الحقول");
+            }
+        }
+
+        function displayPlants() {
+            const plantList = document.getElementById("plantList");
+            plantList.innerHTML = ""; 
+            const plants = JSON.parse(localStorage.getItem("plants")) || [];
+
+            plants.forEach((plant, index) => {
+                const row = document.createElement("tr");
+                
+                // حساب الأيام المتبقية
+                const today = new Date();
+                const lastWateredDate = new Date(plant.lastWatered);
+                const nextWateringDate = new Date(lastWateredDate);
+                nextWateringDate.setDate(lastWateredDate.getDate() + plant.nextWateringDuration);
+                
+                const daysRemaining = Math.ceil((nextWateringDate - today) / (1000 * 60 * 60 * 24));
+
+                row.innerHTML = `
+                    <td>${plant.name}</td>
+                    <td>${plant.lastWatered}</td>
+                    <td>${plant.waterAmount} مل</td>
+                    <td>${daysRemaining > 0 ? daysRemaining : 0} يوم</td>
+                    <td><button onclick="editPlant(${index})"><i class="fas fa-edit"></i></button></td>
+                    <td><button onclick="deletePlant(${index})"><i class="fas fa-trash-alt"></i></button></td>
+                `;
+                plantList.appendChild(row);
+            });
+        }
+
+        function deletePlant(index) {
+            let plants = JSON.parse(localStorage.getItem("plants")) || [];
+            plants.splice(index, 1);
+            localStorage.setItem("plants", JSON.stringify(plants));
+            displayPlants();
+            showAlert("تم حذف النبات بنجاح!");
+        }
+
+        function editPlant(index) {
+            let plants = JSON.parse(localStorage.getItem("plants")) || [];
+            const plant = plants[index];
+
+            document.getElementById("plantName").value = plant.name;
+            document.getElementById("lastWatered").value = plant.lastWatered;
+            document.getElementById("waterAmount").value = plant.waterAmount;
+            document.getElementById("nextWateringDuration").value = plant.nextWateringDuration;
+
+            isEditing = true;
+            editIndex = index;
+            document.getElementById("addPlantButton").innerText = "تحديث النبات";
+        }
+
+        function resetForm() {
+            document.getElementById("plantName").value = "";
+            document.getElementById("lastWatered").value = "";
+            document.getElementById("waterAmount").value = "";
+            document.getElementById("nextWateringDuration").value = "2"; 
+        }
+
+        function showAlert(message) {
+            const alertMessage = document.getElementById("alertMessage");
+            alertMessage.innerText = message;
+            alertMessage.style.display = "block";
+            setTimeout(() => {
+                alertMessage.style.display = "none";
+            }, 5000); // إخفاء الرسالة بعد 5 ثواني
+        }
+    </script>
+</body>
+</html>
